@@ -21,7 +21,8 @@ class Vessel:
 
 
 class SimulationEngine:
-    timestep = 0.1  # target Δt [s]
+    # Run loop target period – one physics step per real-time second
+    timestep = 1.0  # [s]
 
     def __init__(self):
         self.reset()
@@ -38,11 +39,16 @@ class SimulationEngine:
         self.r01 = Vessel("R-01", 10.0, 5.0, 298.0, 0.0)
         # Reaction data
         self.ca_slurry_mass_kg = 5.0 * 1000.0 * 0.10  # 5 m3 × 1000 kg/m3 × 10 %
-        self.pressure_bar = 1.0
+        # absolute pressure in bar (1 bar = atmospheric, so 0 barg)
+        self.pressure_bar_abs = 1.0
         self.time_s = 0.0
+        # simulation speed multiplier (1.0 = real-time, 10 = 10× faster, etc.)
+        self.speed_factor = 1.0
 
     def step(self, dt: float):
         """Advance simulation by dt seconds."""
+        # dt is already scaled by the caller (background thread) according
+        # to `speed_factor`, so we use it directly.
         self.time_s += dt
         # Acid transfer T-01 → M-01 via P-01 (simplified: 0.5 m3/h when running)
         transfer_rate = 0.5 / 3600.0  # m3/s
@@ -87,16 +93,39 @@ class SimulationEngine:
                 n_CO2 = reacted  # kmol
                 T = self.r01.temperature_K
                 p_Pa = n_CO2 * 1000.0 * R_GAS * T / free_vol_m3
-                self.pressure_bar = p_Pa / 1e5
-        # PSV opens at 3 bar
-        if self.pressure_bar > 3.0:
-            relief = (self.pressure_bar - 3.0) * 0.1  # simple proportional relief
-            self.pressure_bar -= relief
+                self.pressure_bar_abs = p_Pa / 1e5
+
+        # PSV opens at 3 barg (i.e. 4 bar absolute)
+        if self.pressure_bar_g > 3.0:
+            # simple proportional relief back towards 3 barg
+            relief = (self.pressure_bar_g - 3.0) * 0.1
+            # convert relief (gauge) to absolute delta
+            self.pressure_bar_abs -= relief
+
+    # -----------------------------------------------------
+    # Convenience helpers
+    # -----------------------------------------------------
+    def set_speed(self, factor: float):
+        """Set simulation speed multiplier (0 .. 100)."""
+        # clamp to sane range
+        self.speed_factor = max(0.0, min(factor, 100.0))
 
     def snapshot(self) -> Dict:
         return {
             "time": self.time_s,
             "tanks": [asdict(v) for v in (self.t01, self.m01, self.r01)],
             "ca_mass": self.ca_slurry_mass_kg,
-            "pressure_bar": self.pressure_bar,
+            "pressure_bar_abs": self.pressure_bar_abs,
+            "pressure_bar_g": self.pressure_bar_g,
+            "running": self.running,
+            "speed_factor": self.speed_factor,
         }
+
+    # -----------------------------------------------------
+    # Derived properties
+    # -----------------------------------------------------
+
+    @property
+    def pressure_bar_g(self) -> float:
+        """Gauge pressure (relative to 1 bar atmosphere)."""
+        return max(0.0, self.pressure_bar_abs - 1.0)
