@@ -215,7 +215,7 @@
         <div>Simulation Speed: <span class="speed-value">{{ roundedSpeed }}×</span></div>
         <div class="speed-slider">
           <span>1×</span>
-          <input type="range" min="1" max="100" step="1" v-model.number="speedFactor" @input="updateSpeed">
+          <input type="range" min="1" max="100" step="1" v-model.number="speedFactor">
           <span>100×</span>
         </div>
       </div>
@@ -339,15 +339,6 @@ createApp({
           updateCharts(json);
         })
         .catch(err => console.error('Error fetching state:', err));
-    }
-
-    function updateSpeed() {
-      fetch('/api/speed', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ factor: parseFloat(state.speedFactor) })
-      })
-      .catch(err => console.error('Error updating speed:', err));
     }
 
     function formatTime(seconds) {
@@ -570,13 +561,23 @@ createApp({
         }
       }
     });
+    
+    // Watch for speed factor changes and update the simulation speed
+    watch(() => state.speedFactor, (newSpeed) => {
+      fetch('/api/speed', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ factor: parseFloat(newSpeed) })
+      })
+      .catch(err => console.error('Error updating speed:', err));
+    }, { immediate: true });
 
     fetchState();
     setInterval(fetchState, 500);
 
     return {
       ...state,
-      start, pause, reset, updateSpeed,
+      start, pause, reset,
       t01Level, m01Level, r01Level,
       t01LevelValue, m01LevelValue, m01ConcentrationValue, r01LevelValue,
       pressureValue, caMassValue, formattedTime, pressure, roundedSpeed,
