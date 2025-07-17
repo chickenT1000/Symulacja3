@@ -26,7 +26,8 @@ The application must display a P&ID-style diagram with animated flows, pump and 
 5. **Pressurised reactor R-01** (10 m³ total volume)  
    • Initially charged with 5 m³ of CaCO₃ slurry (10 % w/w).  
    • Generates CO₂ and a pressure rise during reaction.  
-   • Fitted with safety valve **PSV-01** opening at 3 bar.
+   • Fitted with safety valve **PSV-01** opening at **3 bar (g)**  
+     (i.e. 4 bar absolute).
 
 ---
 
@@ -35,10 +36,14 @@ The application must display a P&ID-style diagram with animated flows, pump and 
 * Real-time simulation showing:  
   – Liquid levels in all vessels  
   – Operating state of pumps and agitator  
-  – Current concentration, temperature and pressure values
+  – Current concentration, temperature and **gauge pressure** values  
+  – **Simulation clock in hh:mm:ss format**
 * **Calculations** tab displaying the equations and steps while the simulation is paused.  
 * **Charts** tab with online plots of key parameters and event tags (pump start, valve opening, …).  
-* **Assumptions** tab describing adopted simplifications (perfect mixing, no flow resistance).
+* **Assumptions** tab describing adopted simplifications (perfect mixing, no flow resistance).  
+* **Controls:** Start, **Pause**, Reset buttons.  
+* **Speed slider** allowing the user to run the model from **0.1× to 100× real-time**.  
+  Charts must update only while the Charts tab is visible.
 
 ---
 
@@ -58,6 +63,7 @@ The application must display a P&ID-style diagram with animated flows, pump and 
 3. M-01 continuously computes solution concentration and temperature.  
 4. When target conditions are reached, pump P-02 sends the mixture to reactor R-01.  
 5. Reaction in R-01 increases pressure; if it exceeds 3 bar, PSV-01 opens and the CO₂ flow rate is calculated and displayed.
+   (Pressure comparison is done on a gauge basis.)
 
 ---
 
@@ -65,7 +71,23 @@ The application must display a P&ID-style diagram with animated flows, pump and 
 
 * Web application written in Python (Flask) or another suitable framework.  
 * Front-end must use an SVG/Canvas library for drawing and animating the P&ID.  
-* Real-time charts: Chart.js, Plotly or similar.  
+* Real-time charts: **Chart.js 4 (or similar).**  
 * Modular structure separating calculation logic from presentation.  
 * Application must run on **localhost, port 8080** (not 3000).  
 * Provide a `start.bat` script that installs dependencies, launches the local server, and opens a browser window pointing to the running application.
+
+### REST API (JSON)
+```
+GET  /api/state   ➔ {time, tanks[], ca_mass, pressure_bar_g,
+                      running, speed_factor}
+POST /api/start
+POST /api/pause
+POST /api/reset
+POST /api/speed   { "factor": <0.1-100> }
+```
+
+### Additional implementation notes
+* Internal engine tracks absolute pressure; UI and PSV logic use
+  `pressure_bar_g = max(0, pressure_bar_abs − 1)`.
+* The **speed factor** multiplies the simulation timestep (`dt_sim = dt × factor`)
+  and applies consistently to all flow and reaction rates.
