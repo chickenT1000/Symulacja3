@@ -1,0 +1,485 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>H₂SO₄–CaCO₃ Process Simulation</title>
+  <script src="https://unpkg.com/vue@3.4.21/dist/vue.global.prod.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.2/dist/chart.umd.min.js"></script>
+  <style>
+    body { font-family: Arial, Helvetica, sans-serif; margin: 0; padding: 0; background: #f0f0f0; }
+    #app { display: flex; flex-direction: column; height: 100vh; }
+    header { background: #3f51b5; color: #fff; padding: 0.5rem 1rem; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+    main { flex: 1; display: flex; gap: 1rem; padding: 1rem; }
+    .diagram-panel { flex: 1.5; background: #fff; border-radius: 8px; padding: 1rem; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+    .control-panel { flex: 1; background: #fff; border-radius: 8px; padding: 1rem; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+    svg { width: 100%; height: 100%; }
+    nav { display: flex; gap: 0.5rem; margin-bottom: 1rem; }
+    button { padding: 0.5rem 1rem; border: none; border-radius: 4px; cursor: pointer; font-size: 14px; }
+    button:hover { opacity: 0.8; }
+    .tab-btn { background: #e0e0e0; }
+    .tab-btn.active { background: #3f51b5; color: #fff; }
+    .control-btn { background: #4caf50; color: #fff; }
+    .control-btn:disabled { background: #ccc; cursor: not-allowed; }
+    .control-btn.pause { background: #ff9800; }
+    .control-btn.reset { background: #f44336; }
+    .panel { flex: 1; overflow: auto; }
+    .status { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 0.5rem; margin-bottom: 1rem; }
+    .status-item { background: #f5f5f5; padding: 0.75rem; border-radius: 4px; }
+    .status-label { font-size: 12px; color: #666; margin-bottom: 0.25rem; }
+    .status-value { font-weight: bold; font-size: 16px; }
+    .pump, .valve, .agitator { transition: all 0.3s ease; }
+    .pump { stroke: #333; stroke-width: 2; fill: #ddd; }
+    .pump.active { fill: #2196f3; }
+    .valve { stroke: #333; stroke-width: 2; fill: #ddd; }
+    .valve.active { fill: #4caf50; }
+    .agitator { stroke: #333; stroke-width: 2; }
+    .agitator.active { animation: rotate 2s linear infinite; }
+    @keyframes rotate { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+    .flow { stroke-dasharray: 10 5; stroke-width: 4; }
+    .flow.active { animation: flow 1s linear infinite; }
+    @keyframes flow { to { stroke-dashoffset: -15; } }
+    .psv { stroke: #333; stroke-width: 2; fill: #ddd; }
+    .psv.active { fill: #f44336; }
+    .chart-container { height: 200px; margin-bottom: 1rem; }
+    .equations { background: #f9f9f9; padding: 1rem; border-radius: 4px; margin-bottom: 1rem; }
+    .equation { font-family: monospace; background: #fff; padding: 0.5rem; margin: 0.5rem 0; border-radius: 4px; }
+    ul { margin: 0; padding-left: 1.5rem; }
+    li { margin-bottom: 0.5rem; }
+  </style>
+</head>
+<body>
+<div id="app">
+  <header>
+    <h2>H₂SO₄–CaCO₃ Process Simulation</h2>
+  </header>
+  <main>
+    <section class="diagram-panel">
+      <h3>P&ID Diagram</h3>
+      <svg viewBox="0 0 800 500" preserveAspectRatio="xMidYMid meet">
+        <defs>
+          <!-- Tank level gradients -->
+          <linearGradient id="t01Grad" x1="0" x2="0" y1="0" y2="1">
+            <stop offset="0" stop-color="#fff" />
+            <stop :offset="t01Level" stop-color="#fff" />
+            <stop :offset="t01Level" stop-color="#ffeb3b" />
+            <stop offset="1" stop-color="#ffeb3b" />
+          </linearGradient>
+          <linearGradient id="m01Grad" x1="0" x2="0" y1="0" y2="1">
+            <stop offset="0" stop-color="#fff" />
+            <stop :offset="m01Level" stop-color="#fff" />
+            <stop :offset="m01Level" stop-color="#2196f3" />
+            <stop offset="1" stop-color="#2196f3" />
+          </linearGradient>
+          <linearGradient id="r01Grad" x1="0" x2="0" y1="0" y2="1">
+            <stop offset="0" stop-color="#fff" />
+            <stop :offset="r01Level" stop-color="#fff" />
+            <stop :offset="r01Level" stop-color="#ff9800" />
+            <stop offset="1" stop-color="#ff9800" />
+          </linearGradient>
+          
+          <marker id="arrow" markerWidth="10" markerHeight="10" refX="5" refY="5" orient="auto">
+            <path d="M0,0 L10,5 L0,10 z" fill="#555" />
+          </marker>
+        </defs>
+
+        <!-- Tanks -->
+        <g>
+          <!-- T-01 Acid Tank -->
+          <rect x="50" y="150" width="100" height="250" stroke="#000" fill="url(#t01Grad)" stroke-width="2" />
+          <text x="100" y="140" text-anchor="middle" font-weight="bold" font-size="14">T-01</text>
+          <text x="100" y="420" text-anchor="middle" font-size="12">H₂SO₄ Buffer</text>
+          
+          <!-- M-01 Dilution Tank -->
+          <rect x="300" y="100" width="120" height="300" stroke="#000" fill="url(#m01Grad)" stroke-width="2" />
+          <text x="360" y="90" text-anchor="middle" font-weight="bold" font-size="14">M-01</text>
+          <text x="360" y="420" text-anchor="middle" font-size="12">Dilution Tank</text>
+          
+          <!-- Agitator in M-01 -->
+          <g class="agitator" :class="{ active: agitatorOn }" transform="translate(360, 250)">
+            <circle cx="0" cy="0" r="15" fill="none" stroke="#333" stroke-width="2" />
+            <line x1="-15" y1="0" x2="15" y2="0" stroke="#333" stroke-width="2" />
+            <line x1="0" y1="-15" x2="0" y2="15" stroke="#333" stroke-width="2" />
+          </g>
+          <text x="360" y="280" text-anchor="middle" font-size="10">AG-01</text>
+          
+          <!-- R-01 Reactor -->
+          <rect x="550" y="50" width="150" height="350" stroke="#000" fill="url(#r01Grad)" stroke-width="2" rx="5" />
+          <text x="625" y="40" text-anchor="middle" font-weight="bold" font-size="14">R-01</text>
+          <text x="625" y="420" text-anchor="middle" font-size="12">Reactor</text>
+          
+          <!-- PSV-01 on Reactor -->
+          <path d="M 700 100 L 720 80 L 740 100 Z" class="psv" :class="{ active: pressure > 3 }" />
+          <text x="720" y="75" text-anchor="middle" font-size="10">PSV-01</text>
+          
+          <!-- CO2 release when PSV active -->
+          <path d="M 720 80 C 730 60, 740 50, 750 30" class="flow" stroke="#666" stroke-width="3" fill="none" :class="{ active: pressure > 3 }" />
+          <text x="750" y="25" text-anchor="middle" font-size="12" :fill="pressure > 3 ? '#f44336' : '#ccc'">CO₂</text>
+        </g>
+
+        <!-- Piping and Equipment -->
+        <g>
+          <!-- P-01 Pump -->
+          <circle cx="200" cy="250" r="20" class="pump" :class="{ active: pump1On }" />
+          <path d="M 185 250 L 215 250 M 200 235 L 200 265" stroke="#000" stroke-width="2" />
+          <text x="200" y="225" text-anchor="middle" font-size="10">P-01</text>
+          
+          <!-- Pipe T-01 to P-01 -->
+          <line x1="150" y1="250" x2="180" y2="250" stroke="#555" stroke-width="5" />
+          
+          <!-- Pipe P-01 to M-01 with flow animation -->
+          <path d="M 220 250 L 300 250" class="flow" stroke="#555" fill="none" :class="{ active: pump1On }" />
+          
+          <!-- V-01 Water Valve -->
+          <rect x="330" y="50" width="20" height="20" class="valve" :class="{ active: valveOn }" transform="rotate(45, 340, 60)" />
+          <text x="340" y="40" text-anchor="middle" font-size="10">V-01</text>
+          
+          <!-- Water feed pipe with flow animation -->
+          <path d="M 340 70 L 340 100" class="flow" stroke="#03a9f4" stroke-width="5" fill="none" :class="{ active: valveOn }" />
+          <text x="320" y="85" text-anchor="end" font-size="10">H₂O</text>
+          
+          <!-- P-02 Pump -->
+          <circle cx="470" cy="250" r="20" class="pump" :class="{ active: pump2On }" />
+          <path d="M 455 250 L 485 250 M 470 235 L 470 265" stroke="#000" stroke-width="2" />
+          <text x="470" y="225" text-anchor="middle" font-size="10">P-02</text>
+          
+          <!-- Pipe M-01 to P-02 -->
+          <line x1="420" y1="250" x2="450" y2="250" stroke="#555" stroke-width="5" />
+          
+          <!-- Pipe P-02 to R-01 with flow animation -->
+          <path d="M 490 250 L 550 250" class="flow" stroke="#555" fill="none" :class="{ active: pump2On }" />
+        </g>
+      </svg>
+    </section>
+    
+    <section class="control-panel">
+      <nav>
+        <button class="tab-btn" :class="{ active: tab === 'status' }" @click="tab = 'status'">Status</button>
+        <button class="tab-btn" :class="{ active: tab === 'charts' }" @click="tab = 'charts'">Charts</button>
+        <button class="tab-btn" :class="{ active: tab === 'calc' }" @click="tab = 'calc'">Calculations</button>
+        <button class="tab-btn" :class="{ active: tab === 'assumptions' }" @click="tab = 'assumptions'">Assumptions</button>
+      </nav>
+      
+      <div style="display: flex; gap: 0.5rem; margin-bottom: 1rem;">
+        <button class="control-btn" @click="start" :disabled="isRunning">Start</button>
+        <button class="control-btn pause" @click="pause" :disabled="!isRunning">Pause</button>
+        <button class="control-btn reset" @click="reset">Reset</button>
+      </div>
+      
+      <div class="panel" v-if="tab === 'status'">
+        <div class="status">
+          <div class="status-item">
+            <div class="status-label">T-01 Level</div>
+            <div class="status-value">{{ t01LevelValue }} m³</div>
+          </div>
+          <div class="status-item">
+            <div class="status-label">M-01 Level</div>
+            <div class="status-value">{{ m01LevelValue }} m³</div>
+          </div>
+          <div class="status-item">
+            <div class="status-label">M-01 Concentration</div>
+            <div class="status-value">{{ m01ConcentrationValue }}%</div>
+          </div>
+          <div class="status-item">
+            <div class="status-label">R-01 Level</div>
+            <div class="status-value">{{ r01LevelValue }} m³</div>
+          </div>
+          <div class="status-item">
+            <div class="status-label">Pressure</div>
+            <div class="status-value">{{ pressureValue }} bar</div>
+          </div>
+          <div class="status-item">
+            <div class="status-label">CaCO₃ Remaining</div>
+            <div class="status-value">{{ caMassValue }} kg</div>
+          </div>
+          <div class="status-item">
+            <div class="status-label">Simulation Time</div>
+            <div class="status-value">{{ timeValue }} s</div>
+          </div>
+        </div>
+      </div>
+      
+      <div class="panel" v-if="tab === 'charts'">
+        <div class="chart-container">
+          <canvas id="pressureChart"></canvas>
+        </div>
+        <div class="chart-container">
+          <canvas id="levelChart"></canvas>
+        </div>
+        <div class="chart-container">
+          <canvas id="concentrationChart"></canvas>
+        </div>
+      </div>
+      
+      <div class="panel" v-if="tab === 'calc'">
+        <h3>Chemical Reaction</h3>
+        <div class="equations">
+          <div class="equation">CaCO₃ + H₂SO₄ → CaSO₄ + CO₂ + H₂O</div>
+        </div>
+        
+        <h3>Mass Balance (Dilution)</h3>
+        <div class="equations">
+          <div class="equation">c₂ = (c₁ × V₁) / (V₁ + V₂)</div>
+          <p>Where:</p>
+          <ul>
+            <li>c₁ = initial concentration [%]</li>
+            <li>c₂ = final concentration [%]</li>
+            <li>V₁ = initial volume [m³]</li>
+            <li>V₂ = added volume [m³]</li>
+          </ul>
+        </div>
+        
+        <h3>Pressure Calculation</h3>
+        <div class="equations">
+          <div class="equation">P = n × R × T / V</div>
+          <p>Where:</p>
+          <ul>
+            <li>P = pressure [Pa]</li>
+            <li>n = moles of CO₂ [mol]</li>
+            <li>R = gas constant [8.314 J/(mol·K)]</li>
+            <li>T = temperature [K]</li>
+            <li>V = headspace volume [m³]</li>
+          </ul>
+        </div>
+      </div>
+      
+      <div class="panel" v-if="tab === 'assumptions'">
+        <h3>Simplifying Assumptions</h3>
+        <ul>
+          <li>Perfect mixing with instantaneous mass and energy exchange</li>
+          <li>No hydrodynamic modeling (no pressure drops or gradients)</li>
+          <li>Reaction of CaCO₃ with H₂SO₄ considered instantaneous</li>
+          <li>Heat from reaction and dilution included; system treated as adiabatic</li>
+          <li>Ideal gas behavior for CO₂ in reactor headspace</li>
+          <li>Constant density for liquids regardless of concentration</li>
+          <li>No heat losses to environment</li>
+          <li>No flow restrictions or pipe sizing considerations</li>
+        </ul>
+      </div>
+    </section>
+  </main>
+</div>
+
+<script>
+const { createApp, reactive, computed } = Vue;
+
+createApp({
+  setup() {
+    const state = reactive({
+      snapshot: null,
+      tab: 'status',
+      charts: {},
+      isRunning: false,
+      prevTime: 0,
+    });
+
+    function fetchState() {
+      fetch('/api/state')
+        .then(r => r.json())
+        .then(json => {
+          state.snapshot = json;
+          state.isRunning = json.time > state.prevTime;
+          state.prevTime = json.time;
+          updateCharts(json);
+        })
+        .catch(err => console.error('Error fetching state:', err));
+    }
+
+    function initCharts() {
+      const pressureCtx = document.getElementById('pressureChart');
+      state.charts.pressure = new Chart(pressureCtx, {
+        type: 'line',
+        data: { 
+          labels: [], 
+          datasets: [{ 
+            label: 'Pressure [bar]', 
+            data: [], 
+            borderColor: '#f44336',
+            backgroundColor: 'rgba(244, 67, 54, 0.1)',
+            tension: 0.2
+          }] 
+        },
+        options: { 
+          responsive: true, maintainAspectRatio: false,
+          animation: false, 
+          scales: { y: { min: 0, max: 5 } },
+          plugins: { legend: { position: 'top' } }
+        },
+      });
+      
+      const levelCtx = document.getElementById('levelChart');
+      state.charts.level = new Chart(levelCtx, {
+        type: 'line',
+        data: { 
+          labels: [], 
+          datasets: [
+            { label: 'T-01 [m³]', data: [], borderColor: '#ffeb3b', tension: 0.2 },
+            { label: 'M-01 [m³]', data: [], borderColor: '#2196f3', tension: 0.2 },
+            { label: 'R-01 [m³]', data: [], borderColor: '#ff9800', tension: 0.2 }
+          ] 
+        },
+        options: { 
+          responsive: true, maintainAspectRatio: false,
+          animation: false, 
+          scales: { y: { min: 0, max: 10 } },
+          plugins: { legend: { position: 'top' } }
+        },
+      });
+      
+      const concCtx = document.getElementById('concentrationChart');
+      state.charts.concentration = new Chart(concCtx, {
+        type: 'line',
+        data: { 
+          labels: [], 
+          datasets: [{ 
+            label: 'M-01 H₂SO₄ [%]', 
+            data: [], 
+            borderColor: '#4caf50',
+            tension: 0.2
+          }] 
+        },
+        options: { 
+          responsive: true, maintainAspectRatio: false,
+          animation: false, 
+          scales: { y: { min: 0, max: 100 } },
+          plugins: { legend: { position: 'top' } }
+        },
+      });
+    }
+
+    function updateCharts(snap) {
+      if (!snap || !state.charts.pressure) return;
+      
+      const timeLabel = snap.time.toFixed(1);
+      const maxPoints = 100;
+      
+      // Update pressure chart
+      state.charts.pressure.data.labels.push(timeLabel);
+      state.charts.pressure.data.datasets[0].data.push(snap.pressure_bar);
+      
+      // Update level chart
+      state.charts.level.data.labels.push(timeLabel);
+      state.charts.level.data.datasets[0].data.push(snap.tanks[0].level_m3);
+      state.charts.level.data.datasets[1].data.push(snap.tanks[1].level_m3);
+      state.charts.level.data.datasets[2].data.push(snap.tanks[2].level_m3);
+      
+      // Update concentration chart
+      state.charts.concentration.data.labels.push(timeLabel);
+      state.charts.concentration.data.datasets[0].data.push(snap.tanks[1].concentration_wt);
+      
+      // Trim charts
+      for (const chart of Object.values(state.charts)) {
+        if (chart.data.labels.length > maxPoints) {
+          chart.data.labels = chart.data.labels.slice(-maxPoints);
+          for (const dataset of chart.data.datasets) {
+            dataset.data = dataset.data.slice(-maxPoints);
+          }
+        }
+        chart.update();
+      }
+    }
+
+    function start() { 
+      fetch('/api/start', { method: 'POST' })
+        .then(() => { state.isRunning = true; });
+    }
+    
+    function pause() { 
+      fetch('/api/pause', { method: 'POST' })
+        .then(() => { state.isRunning = false; });
+    }
+    
+    function reset() { 
+      fetch('/api/reset', { method: 'POST' })
+        .then(() => {
+          state.isRunning = false;
+          state.prevTime = 0;
+          for (const chart of Object.values(state.charts)) {
+            chart.data.labels = [];
+            for (const dataset of chart.data.datasets) {
+              dataset.data = [];
+            }
+            chart.update();
+          }
+        });
+    }
+
+    // Computed properties
+    const t01Level = computed(() => 
+      state.snapshot ? 1 - (state.snapshot.tanks[0].level_m3 / state.snapshot.tanks[0].volume_m3) : 1
+    );
+    
+    const m01Level = computed(() => 
+      state.snapshot ? 1 - (state.snapshot.tanks[1].level_m3 / state.snapshot.tanks[1].volume_m3) : 1
+    );
+    
+    const r01Level = computed(() => 
+      state.snapshot ? 1 - (state.snapshot.tanks[2].level_m3 / state.snapshot.tanks[2].volume_m3) : 1
+    );
+    
+    const t01LevelValue = computed(() => 
+      state.snapshot ? state.snapshot.tanks[0].level_m3.toFixed(2) : "0.00"
+    );
+    
+    const m01LevelValue = computed(() => 
+      state.snapshot ? state.snapshot.tanks[1].level_m3.toFixed(2) : "0.00"
+    );
+    
+    const m01ConcentrationValue = computed(() => 
+      state.snapshot ? state.snapshot.tanks[1].concentration_wt.toFixed(1) : "0.0"
+    );
+    
+    const r01LevelValue = computed(() => 
+      state.snapshot ? state.snapshot.tanks[2].level_m3.toFixed(2) : "0.00"
+    );
+    
+    const pressureValue = computed(() => 
+      state.snapshot ? state.snapshot.pressure_bar.toFixed(2) : "1.00"
+    );
+    
+    const caMassValue = computed(() => 
+      state.snapshot ? state.snapshot.ca_mass.toFixed(1) : "0.0"
+    );
+    
+    const timeValue = computed(() => 
+      state.snapshot ? state.snapshot.time.toFixed(1) : "0.0"
+    );
+    
+    const pressure = computed(() => 
+      state.snapshot ? state.snapshot.pressure_bar : 1
+    );
+    
+    const pump1On = computed(() => 
+      state.snapshot && state.snapshot.tanks[0].level_m3 > 0 && state.snapshot.tanks[1].level_m3 < state.snapshot.tanks[1].volume_m3 && state.isRunning
+    );
+    
+    const pump2On = computed(() => 
+      state.snapshot && state.snapshot.tanks[1].level_m3 > 2 && state.snapshot.tanks[1].concentration_wt < 60 && state.isRunning
+    );
+    
+    const valveOn = computed(() => 
+      state.snapshot && state.snapshot.tanks[1].level_m3 < state.snapshot.tanks[1].volume_m3 && state.isRunning
+    );
+    
+    const agitatorOn = computed(() => 
+      state.snapshot && state.snapshot.tanks[1].level_m3 > 0 && state.isRunning
+    );
+
+    // Initialize
+    initCharts();
+    fetchState();
+    setInterval(fetchState, 500);
+
+    return {
+      ...state,
+      start, pause, reset,
+      t01Level, m01Level, r01Level,
+      t01LevelValue, m01LevelValue, m01ConcentrationValue, r01LevelValue,
+      pressureValue, caMassValue, timeValue, pressure,
+      pump1On, pump2On, valveOn, agitatorOn,
+    };
+  }
+}).mount('#app');
+</script>
+</body>
+</html>
