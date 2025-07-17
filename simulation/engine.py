@@ -6,9 +6,6 @@ from __future__ import annotations
 from dataclasses import dataclass, asdict
 from typing import Dict
 
-import math
-import time
-
 R_GAS = 8.314  # J/mol·K
 M_CACO3 = 100.09  # kg/kmol
 M_H2SO4 = 98.079  # kg/kmol

@@ -10,7 +10,8 @@ from pathlib import Path
 from flask import Flask, jsonify, request, send_from_directory
 from flask_cors import CORS
 
-from simulation.engine import SimulationEngine, get_engine
+from simulation.engine import SimulationEngine
+from simulation import get_engine
 
 app = Flask(__name__, static_folder="static")
 CORS(app)
