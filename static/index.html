@@ -212,10 +212,10 @@
       </div>
       
       <div class="speed-control">
-        <div>Simulation Speed: <span class="speed-value">{{ speedFactor }}×</span></div>
+        <div>Simulation Speed: <span class="speed-value">{{ roundedSpeed }}×</span></div>
         <div class="speed-slider">
-          <span>0.1×</span>
-          <input type="range" min="0.1" max="100" step="0.1" v-model="speedFactor" @change="updateSpeed">
+          <span>1×</span>
+          <input type="range" min="1" max="100" step="1" v-model.number="speedFactor" @input="updateSpeed">
           <span>100×</span>
         </div>
       </div>
@@ -535,6 +535,10 @@ createApp({
     
     const pressure = computed(() => 
       state.snapshot ? state.snapshot.pressure_bar_g : 0
+    );
+    
+    const roundedSpeed = computed(() => 
+      Math.round(state.speedFactor)
     );
     
     const pump1On = computed(() => 
