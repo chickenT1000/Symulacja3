@@ -100,6 +100,27 @@
             <stop :offset="r01Level" stop-color="#ff9800" />
             <stop offset="1" stop-color="#ff9800" />
           </linearGradient>
+
+          <!-- ======================================================== -->
+          <!-- ISO / ISA-5.1 symbol library (minimal subset for demo)   -->
+          <!-- ======================================================== -->
+          <!-- Pump symbol: circle with filled triangle indicating flow -->
+          <symbol id="iso-pump" viewBox="0 0 100 100">
+            <!-- housing -->
+            <circle cx="50" cy="50" r="48" fill="#ddd" stroke="#333" stroke-width="4"/>
+            <!-- rotor cross -->
+            <line x1="50" y1="10" x2="50" y2="90" stroke="#333" stroke-width="6"/>
+            <line x1="10" y1="50" x2="90" y2="50" stroke="#333" stroke-width="6"/>
+            <!-- flow arrow -->
+            <polygon points="70,50 90,40 90,60" fill="#333"/>
+          </symbol>
+
+          <!-- Gate valve symbol: two opposing triangles -->
+          <symbol id="iso-gate-valve" viewBox="0 0 100 100">
+            <polygon points="0,0 50,50 0,100" fill="#ddd" stroke="#333" stroke-width="4"/>
+            <polygon points="100,0 50,50 100,100" fill="#ddd" stroke="#333" stroke-width="4"/>
+          </symbol>
+
           
           <marker id="arrow" markerWidth="10" markerHeight="10" refX="5" refY="5" orient="auto">
             <path d="M0,0 L10,5 L0,10 z" fill="#555" />
@@ -143,8 +164,8 @@
         <!-- Piping and Equipment -->
         <g>
           <!-- P-01 Pump -->
-          <circle cx="200" cy="250" r="20" class="pump" :class="{ active: pump1On }" />
-          <path d="M 185 250 L 215 250 M 200 235 L 200 265" stroke="#000" stroke-width="2" />
+          <use href="#iso-pump" x="180" y="230" width="40" height="40"
+               class="pump" :class="{ active: pump1On }"/>
           <text x="200" y="225" text-anchor="middle" font-size="10">P-01</text>
           
           <!-- Pipe T-01 to P-01 -->
@@ -154,7 +175,8 @@
           <path d="M 220 250 L 300 250" class="flow" stroke="#555" fill="none" :class="{ active: pump1On }" />
           
           <!-- V-01 Water Valve -->
-          <rect x="330" y="50" width="20" height="20" class="valve" :class="{ active: valveOn }" transform="rotate(45, 340, 60)" />
+          <use href="#iso-gate-valve" x="325" y="45" width="30" height="30"
+               class="valve" :class="{ active: valveOn }" transform="rotate(45, 340, 60)"/>
           <text x="340" y="40" text-anchor="middle" font-size="10">V-01</text>
           
           <!-- Water feed pipe with flow animation -->
@@ -162,8 +184,8 @@
           <text x="320" y="85" text-anchor="end" font-size="10">H₂O</text>
           
           <!-- P-02 Pump -->
-          <circle cx="470" cy="250" r="20" class="pump" :class="{ active: pump2On }" />
-          <path d="M 455 250 L 485 250 M 470 235 L 470 265" stroke="#000" stroke-width="2" />
+          <use href="#iso-pump" x="450" y="230" width="40" height="40"
+               class="pump" :class="{ active: pump2On }"/>
           <text x="470" y="225" text-anchor="middle" font-size="10">P-02</text>
           
           <!-- Pipe M-01 to P-02 -->
