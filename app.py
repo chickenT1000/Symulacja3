@@ -7,6 +7,8 @@ import threading
 import time
 from pathlib import Path
 
+import logging  # added for diagnostics
+
 from flask import Flask, jsonify, request, send_from_directory
 from flask_cors import CORS
 
@@ -16,6 +18,14 @@ from simulation import get_engine
 app = Flask(__name__, static_folder="static")
 CORS(app)
 
+# ---------------------------------------------------------------------------
+# Basic diagnostic logging
+# ---------------------------------------------------------------------------
+logging.basicConfig(
+    filename="speed_debug.log",
+    level=logging.INFO,
+    format="%(asctime)s %(message)s",
+)
 
 def _background_loop(engine: SimulationEngine):
     """
@@ -34,6 +44,8 @@ def _background_loop(engine: SimulationEngine):
         engine.step(engine.timestep)
         # Real-time pacing
         sf = max(engine.speed_factor, 0.001)  # avoid division by zero
+        # Diagnostic entry for each loop iteration
+        logging.info("LOOP speed=%.2f dt=%.2f", engine.speed_factor, engine.timestep)
         time.sleep(engine.timestep / sf)
 
 
@@ -85,6 +97,8 @@ def set_speed():
 
     engine = get_engine()
     engine.set_speed(factor)
+    # Diagnostic entry for speed changes
+    logging.info("SET_SPEED %.2f", factor)
     return ("", 204)
 
 
