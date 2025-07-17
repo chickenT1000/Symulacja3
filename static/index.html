@@ -335,7 +335,9 @@ createApp({
           state.snapshot = json;
           state.isRunning = json.running || (json.time > state.prevTime);
           state.prevTime = json.time;
-          state.speedFactor = json.speed_factor || 1.0;
+          // ---- diagnostics ----------------------------------------
+          console.debug('Snapshot speed_factor', json.speed_factor);
+          // ----------------------------------------------------------
           updateCharts(json);
         })
         .catch(err => console.error('Error fetching state:', err));
@@ -564,6 +566,9 @@ createApp({
     
     // Watch for speed factor changes and update the simulation speed
     watch(() => state.speedFactor, (newSpeed) => {
+      // ---- diagnostics ----------------------------------------
+      console.debug('SpeedFactor changed', newSpeed);
+      // ----------------------------------------------------------
       fetch('/api/speed', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
