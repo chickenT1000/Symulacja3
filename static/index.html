@@ -215,7 +215,11 @@
         <div>Simulation Speed: <span class="speed-value">{{ roundedSpeed }}×</span></div>
         <div class="speed-slider">
           <span>1×</span>
-          <input type="range" min="1" max="100" step="1" v-model.number="speedFactor">
+          <!-- use explicit handler so we’re sure the event fires -->
+          <input type="range"
+                 min="1" max="100" step="1"
+                 :value="speedFactor"
+                 @input="onSpeedInput">
           <span>100×</span>
         </div>
       </div>
@@ -580,9 +584,14 @@ createApp({
     fetchState();
     setInterval(fetchState, 500);
 
+    // -------- helper to receive slider input --------------------
+    function onSpeedInput(evt){
+      state.speedFactor = Number(evt.target.value);
+    }
+
     return {
       ...state,
-      start, pause, reset,
+      start, pause, reset, onSpeedInput,
       t01Level, m01Level, r01Level,
       t01LevelValue, m01LevelValue, m01ConcentrationValue, r01LevelValue,
       pressureValue, caMassValue, formattedTime, pressure, roundedSpeed,
