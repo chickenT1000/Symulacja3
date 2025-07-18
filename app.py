@@ -65,6 +65,35 @@ def start():
 
 
 @app.route("/api/pause", methods=["POST"])
+# Device ON/OFF endpoint
+# -----------------------------------------------------
+
+@app.route("/api/device", methods=["POST"])
+def set_device():
+    """
+    Toggle a pump / valve / agitator.
+    JSON body: { "id": "P01" | "P02" | "V01" | "AG01",
+                 "on": true | false }
+    """
+    data = request.get_json(silent=True) or {}
+    dev_id = data.get("id")
+    on_flag = data.get("on")
+
+    if dev_id is None or on_flag is None:
+        return jsonify({"error": "JSON must include 'id' and 'on'"}), 400
+
+    engine = get_engine()
+    try:
+        engine.set_device(dev_id, bool(on_flag))
+    except ValueError as exc:
+        return jsonify({"error": str(exc)}), 400
+
+    # Diagnostics
+    logging.info("SET_DEVICE %s %s", dev_id, "ON" if on_flag else "OFF")
+    return ("", 204)
+
+
+# Serve the single-page front-end
 def pause():
     engine = get_engine()
     engine.running = False

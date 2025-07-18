@@ -30,11 +30,11 @@
     .status-value { font-weight: bold; font-size: 16px; }
     .pump, .valve, .agitator { transition: all 0.3s ease; }
     .pump { stroke: #333; stroke-width: 2; fill: #ddd; }
-    .pump.active { fill: #2196f3; }
-    .valve { stroke: #333; stroke-width: 2; fill: #ddd; }
-    .valve.active { fill: #4caf50; }
+    .pump.on { fill: #4caf50; animation: rotate 2s linear infinite; }
+    .valve { stroke: #333; stroke-width: 2; fill: #f44336; }
+    .valve.on { fill: #4caf50; }
     .agitator { stroke: #333; stroke-width: 2; }
-    .agitator.active { animation: rotate 2s linear infinite; }
+    .agitator.on { animation: rotate 2s linear infinite; }
     @keyframes rotate { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
     .flow { stroke-dasharray: 10 5; stroke-width: 4; }
     .flow.active { animation: flow 1s linear infinite; }
@@ -68,6 +68,44 @@
       font-weight: bold;
       min-width: 3rem;
       text-align: right;
+    }
+    /* Device control buttons */
+    .device-controls {
+      background: #f5f5f5;
+      padding: 0.75rem;
+      border-radius: 4px;
+      margin-bottom: 1rem;
+    }
+    .device-controls h3 {
+      margin-top: 0;
+      margin-bottom: 0.75rem;
+    }
+    .device-grid {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 0.5rem;
+    }
+    .dev-btn {
+      padding: 0.5rem;
+      border-radius: 4px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      font-weight: bold;
+    }
+    .dev-btn.on {
+      background: #4caf50;
+      color: white;
+    }
+    .dev-btn.off {
+      background: #f44336;
+      color: white;
+    }
+    .dev-status {
+      font-size: 0.8rem;
+      padding: 0.25rem 0.5rem;
+      border-radius: 3px;
+      background: rgba(255,255,255,0.3);
     }
   </style>
 </head>
@@ -140,7 +178,7 @@
           <text x="360" y="420" text-anchor="middle" font-size="12">Dilution Tank</text>
           
           <!-- Agitator in M-01 -->
-          <g class="agitator" :class="{ active: agitatorOn }" transform="translate(360, 250)">
+          <g class="agitator" :class="{ on: devices.AG01 }" transform="translate(360, 250)">
             <circle cx="0" cy="0" r="15" fill="none" stroke="#333" stroke-width="2" />
             <line x1="-15" y1="0" x2="15" y2="0" stroke="#333" stroke-width="2" />
             <line x1="0" y1="-15" x2="0" y2="15" stroke="#333" stroke-width="2" />
@@ -165,34 +203,34 @@
         <g>
           <!-- P-01 Pump -->
           <use href="#iso-pump" x="180" y="230" width="40" height="40"
-               class="pump" :class="{ active: pump1On }"/>
+               class="pump" :class="{ on: devices.P01 }"/>
           <text x="200" y="225" text-anchor="middle" font-size="10">P-01</text>
           
           <!-- Pipe T-01 to P-01 -->
           <line x1="150" y1="250" x2="180" y2="250" stroke="#555" stroke-width="5" />
           
           <!-- Pipe P-01 to M-01 with flow animation -->
-          <path d="M 220 250 L 300 250" class="flow" stroke="#555" fill="none" :class="{ active: pump1On }" />
+          <path d="M 220 250 L 300 250" class="flow" stroke="#555" fill="none" :class="{ active: devices.P01 }" />
           
           <!-- V-01 Water Valve -->
           <use href="#iso-gate-valve" x="325" y="45" width="30" height="30"
-               class="valve" :class="{ active: valveOn }" transform="rotate(45, 340, 60)"/>
+               class="valve" :class="{ on: devices.V01 }" transform="rotate(45, 340, 60)"/>
           <text x="340" y="40" text-anchor="middle" font-size="10">V-01</text>
           
           <!-- Water feed pipe with flow animation -->
-          <path d="M 340 70 L 340 100" class="flow" stroke="#03a9f4" stroke-width="5" fill="none" :class="{ active: valveOn }" />
+          <path d="M 340 70 L 340 100" class="flow" stroke="#03a9f4" stroke-width="5" fill="none" :class="{ active: devices.V01 }" />
           <text x="320" y="85" text-anchor="end" font-size="10">H₂O</text>
           
           <!-- P-02 Pump -->
           <use href="#iso-pump" x="450" y="230" width="40" height="40"
-               class="pump" :class="{ active: pump2On }"/>
+               class="pump" :class="{ on: devices.P02 }"/>
           <text x="470" y="225" text-anchor="middle" font-size="10">P-02</text>
           
           <!-- Pipe M-01 to P-02 -->
           <line x1="420" y1="250" x2="450" y2="250" stroke="#555" stroke-width="5" />
           
           <!-- Pipe P-02 to R-01 with flow animation -->
-          <path d="M 490 250 L 550 250" class="flow" stroke="#555" fill="none" :class="{ active: pump2On }" />
+          <path d="M 490 250 L 550 250" class="flow" stroke="#555" fill="none" :class="{ active: devices.P02 }" />
         </g>
       </svg>
     </section>
@@ -207,15 +245,35 @@
       
       <div style="display: flex; gap: 0.5rem; margin-bottom: 1rem;">
         <button class="control-btn" @click="start" :disabled="isRunning">Start</button>
-        <button class="control-btn pause" @click="pause" :disabled="!isRunning">Pause</button>
+        <!-- Pause should always be clickable; backend guards handle state -->
+        <button class="control-btn pause" @click="pause">Pause</button>
         <button class="control-btn reset" @click="reset">Reset</button>
+      </div>
+      
+      <!-- Device controls section -->
+      <div class="device-controls">
+        <h3>Device Controls</h3>
+        <div class="device-grid">
+          <button class="dev-btn" :class="devices.P01 ? 'on' : 'off'" @click="toggleDevice('P01')">
+            P-01 <span class="dev-status">{{ devices.P01 ? 'ON' : 'OFF' }}</span>
+          </button>
+          <button class="dev-btn" :class="devices.P02 ? 'on' : 'off'" @click="toggleDevice('P02')">
+            P-02 <span class="dev-status">{{ devices.P02 ? 'ON' : 'OFF' }}</span>
+          </button>
+          <button class="dev-btn" :class="devices.V01 ? 'on' : 'off'" @click="toggleDevice('V01')">
+            V-01 <span class="dev-status">{{ devices.V01 ? 'ON' : 'OFF' }}</span>
+          </button>
+          <button class="dev-btn" :class="devices.AG01 ? 'on' : 'off'" @click="toggleDevice('AG01')">
+            AG-01 <span class="dev-status">{{ devices.AG01 ? 'ON' : 'OFF' }}</span>
+          </button>
+        </div>
       </div>
       
       <div class="speed-control">
         <div>Simulation Speed: <span class="speed-value">{{ roundedSpeed }}×</span></div>
         <div class="speed-slider">
           <span>1×</span>
-          <!-- use explicit handler so we’re sure the event fires -->
+          <!-- use explicit handler so we're sure the event fires -->
           <input type="range"
                  min="1" max="100" step="1"
                  :value="speedFactor"
@@ -251,6 +309,22 @@
             <div class="status-value">{{ caMassValue }} kg</div>
           </div>
           <div class="status-item">
+            <div class="status-label">Vent Flow</div>
+            <div class="status-value">{{ ventFlowValue }} m³/h</div>
+          </div>
+          <div class="status-item">
+            <div class="status-label">Off-gas Temp</div>
+            <div class="status-value">{{ offGasTempValue }} °C</div>
+          </div>
+          <div class="status-item">
+            <div class="status-label">Humidity</div>
+            <div class="status-value">{{ humidityValue }} %</div>
+          </div>
+          <div class="status-item">
+            <div class="status-label">Cum. Heat</div>
+            <div class="status-value">{{ heatValue }} kJ</div>
+          </div>
+          <div class="status-item">
             <div class="status-label">Simulation Time</div>
             <div class="status-value">{{ formattedTime }}</div>
           </div>
@@ -266,6 +340,12 @@
         </div>
         <div class="chart-container">
           <canvas id="concentrationChart"></canvas>
+        </div>
+        <div class="chart-container">
+          <canvas id="gasChart"></canvas>
+        </div>
+        <div class="chart-container">
+          <canvas id="heatChart"></canvas>
         </div>
       </div>
       
@@ -329,7 +409,13 @@ createApp({
       charts: {},
       isRunning: false,
       prevTime: 0,
-      speedFactor: 1.0
+      speedFactor: 1.0,
+      devices: {
+        P01: false,
+        P02: false,
+        V01: false,
+        AG01: false
+      }
     });
 
     function fetchState() {
@@ -339,12 +425,38 @@ createApp({
           state.snapshot = json;
           state.isRunning = json.running || (json.time > state.prevTime);
           state.prevTime = json.time;
+          
+          // Update device states from snapshot
+          if (json.devices) {
+            state.devices.P01 = json.devices.P01;
+            state.devices.P02 = json.devices.P02;
+            state.devices.V01 = json.devices.V01;
+            state.devices.AG01 = json.devices.AG01;
+          }
+          
           // ---- diagnostics ----------------------------------------
           console.debug('Snapshot speed_factor', json.speed_factor);
           // ----------------------------------------------------------
           updateCharts(json);
         })
         .catch(err => console.error('Error fetching state:', err));
+    }
+
+    // Toggle device state (pump/valve/agitator)
+    function toggleDevice(id) {
+      const currentState = state.devices[id];
+      const newState = !currentState;
+      
+      fetch('/api/device', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id: id, on: newState })
+      })
+      .then(() => {
+        // Optimistically update UI
+        state.devices[id] = newState;
+      })
+      .catch(err => console.error(`Error toggling device ${id}:`, err));
     }
 
     function formatTime(seconds) {
@@ -421,6 +533,35 @@ createApp({
           plugins: { legend: { position: 'top' } }
         },
       });
+
+      /* ---------- Gas chart (CO₂ flow + off-gas T) -------------------- */
+      const gasCtx = document.getElementById('gasChart');
+      state.charts.gas = new Chart(gasCtx, {
+        type: 'line',
+        data: {
+          labels: [],
+          datasets: [
+            { /* Vent flow */ label: 'Vent flow [m³/h]',
+              data: [],
+              borderColor: '#9c27b0',
+              yAxisID: 'y',
+              tension: 0.2 },
+            { /* Temp */ label: 'Off-gas T [°C]',
+              data: [],
+              borderColor: '#ff9800',
+              yAxisID: 'y1',
+              tension: 0.2 }
+          ]
+        },
+        options: { responsive: true, maintainAspectRatio: false, animation: false,
+          scales: {
+            y: { type: 'linear', position: 'left', title: { display: true, text: 'm³/h' } },
+            y1:{ type: 'linear', position: 'right', grid: { drawOnChartArea: false },
+                 title:{ display: true, text: '°C' } }
+          },
+          plugins: { legend: { position: 'top' } }
+        }
+      });
     }
 
     function updateCharts(snap) {
@@ -442,6 +583,11 @@ createApp({
       // Update concentration chart
       state.charts.concentration.data.labels.push(timeLabel);
       state.charts.concentration.data.datasets[0].data.push(snap.tanks[1].concentration_wt);
+
+      // Update gas chart
+      state.charts.gas.data.labels.push(timeLabel);
+      state.charts.gas.data.datasets[0].data.push(snap.co2_flow_m3_h);
+      state.charts.gas.data.datasets[1].data.push(snap.off_gas_temp_C);
       
       // Trim charts
       for (const chart of Object.values(state.charts)) {
@@ -465,11 +611,13 @@ createApp({
     }
 
     function start() { 
+      if (state.isRunning) return;   // guard: already running
       fetch('/api/start', { method: 'POST' })
         .then(() => { state.isRunning = true; });
     }
     
     function pause() { 
+      if (!state.isRunning) return;  // guard: already paused
       fetch('/api/pause', { method: 'POST' })
         .then(() => { state.isRunning = false; });
     }
@@ -479,6 +627,12 @@ createApp({
         .then(() => {
           state.isRunning = false;
           state.prevTime = 0;
+          // Reset device states
+          state.devices.P01 = false;
+          state.devices.P02 = false;
+          state.devices.V01 = false;
+          state.devices.AG01 = false;
+          // Clear charts
           for (const chart of Object.values(state.charts)) {
             chart.data.labels = [];
             for (const dataset of chart.data.datasets) {
@@ -526,6 +680,19 @@ createApp({
       state.snapshot ? state.snapshot.ca_mass.toFixed(1) : "0.0"
     );
     
+    /* ---- new gas values ------------------------------------------------ */
+    const ventFlowValue = computed(() =>
+      state.snapshot ? state.snapshot.co2_flow_m3_h.toFixed(1) : "0.0"
+    );
+
+    const offGasTempValue = computed(() =>
+      state.snapshot ? state.snapshot.off_gas_temp_C.toFixed(1) : "0.0"
+    );
+    
+    const humidityValue = computed(() =>
+      state.snapshot ? state.snapshot.humidity_pct.toFixed(1) : "0.0"
+    );
+
     const formattedTime = computed(() => 
       state.snapshot ? formatTime(state.snapshot.time) : "00:00:00"
     );
@@ -536,22 +703,6 @@ createApp({
     
     const roundedSpeed = computed(() => 
       Math.round(state.speedFactor)
-    );
-    
-    const pump1On = computed(() => 
-      state.snapshot && state.snapshot.tanks[0].level_m3 > 0 && state.snapshot.tanks[1].level_m3 < state.snapshot.tanks[1].volume_m3 && state.isRunning
-    );
-    
-    const pump2On = computed(() => 
-      state.snapshot && state.snapshot.tanks[1].level_m3 > 2 && state.snapshot.tanks[1].concentration_wt < 60 && state.isRunning
-    );
-    
-    const valveOn = computed(() => 
-      state.snapshot && state.snapshot.tanks[1].level_m3 < state.snapshot.tanks[1].volume_m3 && state.isRunning
-    );
-    
-    const agitatorOn = computed(() => 
-      state.snapshot && state.snapshot.tanks[1].level_m3 > 0 && state.isRunning
     );
 
     // Initialize charts once DOM is mounted
@@ -591,11 +742,11 @@ createApp({
 
     return {
       ...state,
-      start, pause, reset, onSpeedInput,
+      start, pause, reset, onSpeedInput, toggleDevice,
       t01Level, m01Level, r01Level,
       t01LevelValue, m01LevelValue, m01ConcentrationValue, r01LevelValue,
-      pressureValue, caMassValue, formattedTime, pressure, roundedSpeed,
-      pump1On, pump2On, valveOn, agitatorOn,
+      pressureValue, caMassValue, ventFlowValue, offGasTempValue, humidityValue,
+      formattedTime, pressure, roundedSpeed
     };
   }
 }).mount('#app');
