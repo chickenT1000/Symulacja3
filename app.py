@@ -7,6 +7,8 @@ import threading
 import time
 from pathlib import Path
 
+import logging  # added for diagnostics
+
 from flask import Flask, jsonify, request, send_from_directory
 from flask_cors import CORS
 
@@ -16,16 +18,35 @@ from simulation import get_engine
 app = Flask(__name__, static_folder="static")
 CORS(app)
 
+# ---------------------------------------------------------------------------
+# Basic diagnostic logging
+# ---------------------------------------------------------------------------
+logging.basicConfig(
+    filename="speed_debug.log",
+    level=logging.INFO,
+    format="%(asctime)s %(message)s",
+)
 
 def _background_loop(engine: SimulationEngine):
-    """Runs the simulation on a background thread."""
-    last_time = time.perf_counter()
+    """
+    Background simulation thread.
+
+    Each loop:
+    • advances the model by the engine’s fixed timestep
+      (`engine.step(engine.timestep)`), **not** by real-time Δt
+    • sleeps for `timestep / speed_factor`, so the real-time pace
+      changes when the UI posts a new speed factor
+        – speed_factor == 1  → 1 physics step / s   (low CPU)
+        – speed_factor == 10 → 10 steps / s         (faster sim)
+    """
     while engine.running:
-        now = time.perf_counter()
-        dt = now - last_time
-        last_time = now
-        engine.step(dt)
-        time.sleep(max(0.05, engine.timestep - dt))  # ~20 Hz
+        # Advance physics
+        engine.step(engine.timestep)
+        # Real-time pacing
+        sf = max(engine.speed_factor, 0.001)  # avoid division by zero
+        # Diagnostic entry for each loop iteration
+        logging.info("LOOP speed=%.2f dt=%.2f", engine.speed_factor, engine.timestep)
+        time.sleep(engine.timestep / sf)
 
 
 @app.route("/api/state")
@@ -53,6 +74,31 @@ def pause():
 @app.route("/api/reset", methods=["POST"])
 def reset():
     get_engine().reset()
+    return ("", 204)
+
+# -----------------------------------------------------
+# Speed-control endpoint
+# -----------------------------------------------------
+
+@app.route("/api/speed", methods=["POST"])
+def set_speed():
+    """
+    Set the simulation speed multiplier.
+    Expects JSON body: { "factor": <number 0-100> }
+    """
+    data = request.get_json(silent=True) or {}
+    if "factor" not in data:
+        return jsonify({"error": "JSON payload must include 'factor'"}), 400
+
+    try:
+        factor = float(data["factor"])
+    except (TypeError, ValueError):
+        return jsonify({"error": "'factor' must be a numeric value"}), 400
+
+    engine = get_engine()
+    engine.set_speed(factor)
+    # Diagnostic entry for speed changes
+    logging.info("SET_SPEED %.2f", factor)
     return ("", 204)
 
 
